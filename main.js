@@ -71,7 +71,7 @@
             codeArea.value = pageSrc;
         }
           
-          function download(data, filename, type) {
+        function download(data, filename, type) {
     var file = new Blob([data], {type: type});
     if (window.navigator.msSaveOrOpenBlob) // IE10+
         window.navigator.msSaveOrOpenBlob(file, filename);
@@ -82,20 +82,18 @@
         a.download = filename;
         document.body.appendChild(a);
         a.click();
-        setTimeout(function() {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);  
-        }, 0); 
-    }
-}
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);  
+            }, 0); 
+        }
+        }
           function makeName() {
-  var text = "";
-  var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-  for (var i = 0; i < 5; i++)
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-
-  return text;
+            var text = "";
+            var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            for (var i = 0; i < 5; i++)
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+            return text;
 }
          function savePage(){
              download(codeArea.value, makeName()+".html", "html");
@@ -119,7 +117,6 @@
                     var val = this.value,
                         start = this.selectionStart,
                         end = this.selectionEnd;
-
                     // set textarea value to: text before caret + tab + text after caret
                     this.value = val.substring(0, start) + '\t' + val.substring(end);
 
