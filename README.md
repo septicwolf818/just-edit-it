@@ -1,6 +1,6 @@
 # One page HTML/CSS/JS editor
 
-## Note: Editor uses HTML ```html <iframe>``` tag
+## Note: Editor uses HTML ```<iframe>``` tag
 
 Simple HTML / CSS / JS code editor with live preview.
 
