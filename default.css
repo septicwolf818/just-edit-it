@@ -221,6 +221,10 @@ body {
 }
 
 /* Toggle Button States */
+.toggle-button {
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+}
+
 .toggle-button[aria-pressed="true"] {
   background-color: var(--color-success);
   border-color: var(--color-success);

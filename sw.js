@@ -115,19 +115,3 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Background sync for saving drafts (if supported)
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'save-draft') {
-    event.waitUntil(saveDraftToIndexedDB());
-  }
-});
-
-// Helper function to save drafts to IndexedDB
-async function saveDraftToIndexedDB() {
-  try {
-    // This would integrate with your main app's draft saving logic
-    console.log('Background sync: saving draft');
-  } catch (error) {
-    console.error('Failed to save draft in background:', error);
-  }
-}
