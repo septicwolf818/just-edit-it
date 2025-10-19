@@ -60,6 +60,113 @@ class CodeEditor {
   setupInitialState() {
     this.setFontSize();
     this.showPreviewDisabledMessage();
+    this.handlePWAActions();
+  }
+
+  // Handle PWA actions from URL parameters
+  handlePWAActions() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+    
+    if (action) {
+      this.executePWAAction(action);
+      // Clean up URL without reloading
+      const cleanUrl = new URL(window.location);
+      cleanUrl.searchParams.delete('action');
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }
+
+  // Execute specific PWA action
+  executePWAAction(action) {
+    switch (action) {
+      case 'new':
+        this.loadSamplePage();
+        this.showActionNotification('New project loaded!', 'success');
+        break;
+      case 'blank':
+        this.clearEditor();
+        this.showActionNotification('Blank editor ready!', 'info');
+        break;
+      case 'preview':
+        this.clearEditor();
+        if (!this.livePreviewEnabled) {
+          this.toggleLivePreview();
+        }
+        this.showActionNotification('Live preview enabled!', 'success');
+        break;
+      default:
+        console.log('Unknown PWA action:', action);
+    }
+  }
+
+  // Clear editor content
+  clearEditor() {
+    const { codeArea } = this.elements;
+    codeArea.value = '';
+    codeArea.focus();
+    if (this.livePreviewEnabled) {
+      this.updatePreview();
+    }
+    this.showActionNotification('Editor cleared', 'info');
+  }
+
+
+
+  // Show temporary notification for actions
+  showActionNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    
+    // Define notification colors based on type
+    const notificationStyles = {
+      success: '#4ade80',
+      warning: '#fbbf24',
+      error: '#ef4444',
+      info: '#2563eb'
+    };
+    
+    const backgroundColor = notificationStyles[type] || notificationStyles.info;
+    
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${backgroundColor};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 1000;
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      max-width: 300px;
+      word-wrap: break-word;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+      notification.style.opacity = '1';
+      notification.style.transform = 'translateY(0)';
+    });
+    
+    // Auto-remove after delay (longer for warnings/errors)
+    const delay = type === 'warning' || type === 'error' ? 4000 : 3000;
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateY(-20px)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, delay);
   }
 
   // Handle code changes
@@ -116,15 +223,15 @@ class CodeEditor {
     const { liveToggle } = this.elements;
     
     if (this.livePreviewEnabled) {
-      liveToggle.innerHTML = '✓';
-      liveToggle.style.color = '#4ade80';
+      liveToggle.textContent = '✓';
       liveToggle.setAttribute('aria-pressed', 'true');
       this.updatePreview();
+      this.showActionNotification('Live preview enabled!', 'success');
     } else {
-      liveToggle.innerHTML = '✗';
-      liveToggle.style.color = '#ef4444';
+      liveToggle.textContent = '✕';
       liveToggle.setAttribute('aria-pressed', 'false');
       this.showPreviewDisabledMessage();
+      this.showActionNotification('Live preview disabled', 'info');
     }
   }
 
@@ -204,6 +311,9 @@ class CodeEditor {
     
     fontSizeInput.value = newSize;
     this.applyFontSize(newSize);
+    
+    // Show notification for font size change
+    this.showActionNotification(`Font size: ${newSize}px`, 'info');
   }
 
   // Set font size from input
@@ -268,6 +378,9 @@ class CodeEditor {
     
     // Focus back to the code area
     codeArea.focus();
+    
+    // Show notification
+    this.showActionNotification('Sample code loaded!', 'success');
   }
 
   // Generate random filename
@@ -283,47 +396,110 @@ class CodeEditor {
     return `code_${result}.html`;
   }
 
-  // Download file
+  // Download file with best available feedback
   downloadFile(content, filename, mimeType = 'text/html') {
     try {
       const blob = new Blob([content], { type: mimeType });
       
       if (navigator.msSaveOrOpenBlob) {
-        // IE10+
-        navigator.msSaveOrOpenBlob(blob, filename);
+        // IE10+ - this method provides synchronous feedback
+        try {
+          navigator.msSaveOrOpenBlob(blob, filename);
+          this.showActionNotification(`File saved: ${filename}`, 'success');
+        } catch (ieError) {
+          throw ieError;
+        }
       } else {
-        // Modern browsers
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        
-        link.href = url;
-        link.download = filename;
-        link.style.display = 'none';
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }, 100);
+        // Modern browsers - use File System Access API if available (Chrome 86+)
+        if ('showSaveFilePicker' in window) {
+          this.downloadWithFileSystemAPI(content, filename, mimeType);
+        } else {
+          // Fallback to traditional download with enhanced detection
+          this.downloadWithLinkMethod(content, filename, mimeType);
+        }
       }
     } catch (error) {
       console.error('Download failed:', error);
-      // Fallback: copy to clipboard
-      this.copyToClipboard(content);
+      this.showActionNotification('Download failed', 'error');
     }
   }
 
-  // Copy content to clipboard as fallback
-  async copyToClipboard(text) {
+  // Modern File System Access API (Chrome 86+, Edge 86+)
+  async downloadWithFileSystemAPI(content, filename, mimeType) {
     try {
-      await navigator.clipboard.writeText(text);
-      alert('Code copied to clipboard!');
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'HTML files',
+          accept: { 'text/html': ['.html', '.htm'] }
+        }]
+      });
+      
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      
+      // Get the actual filename chosen by the user
+      const actualFilename = fileHandle.name;
+      this.showActionNotification(`File saved: ${actualFilename}`, 'success');
     } catch (error) {
-      console.error('Clipboard operation failed:', error);
+      if (error.name === 'AbortError') {
+        this.showActionNotification('Save cancelled by user', 'info');
+      } else {
+        throw error; // Re-throw to be caught by outer try-catch
+      }
     }
+  }
+
+  // Traditional link download method with enhanced user feedback
+  downloadWithLinkMethod(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    // Add focus/blur detection to improve feedback timing
+    let downloadStarted = false;
+    
+    const handleWindowBlur = () => {
+      if (!downloadStarted) {
+        downloadStarted = true;
+        setTimeout(() => {
+          this.showActionNotification(`Download starting: ${filename}`, 'success');
+        }, 200);
+      }
+    };
+    
+    const handleWindowFocus = () => {
+      if (downloadStarted) {
+        setTimeout(() => {
+          this.showActionNotification('Check your Downloads folder', 'info');
+        }, 500);
+      }
+    };
+    
+    // Listen for window events that might indicate download dialog
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      
+      // Fallback notification if no other feedback was given
+      if (!downloadStarted) {
+        this.showActionNotification(`Download initiated: ${filename}`, 'success');
+      }
+    }, 1000);
   }
 
   // Save code as HTML file
@@ -332,7 +508,7 @@ class CodeEditor {
     const code = codeArea.value.trim();
     
     if (!code) {
-      alert('Please write some code before saving!');
+      this.showActionNotification('Please write some code before saving!', 'warning');
       return;
     }
     
